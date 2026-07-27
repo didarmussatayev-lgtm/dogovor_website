@@ -1,5 +1,5 @@
 // API Configuration
-const WEBHOOK_URL = 'https://primary-production-7d413.up.railway.app/webhook/promed';
+const WEBHOOK_URL = 'https://primary-production-7d413.up.railway.app/webhook-test/promed';
 
 // Canvas variables
 let canvas;
