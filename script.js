@@ -377,23 +377,41 @@ function validateAllFields() {
     return isValid;
 }
 
-// ===== Submit / Webhook / Download agreement =====
-function setFinalButtonAsDownloadUrl(downloadUrl) {
-    const btn = document.querySelector('.btn-submit');
-    btn.type = 'button';
-    btn.disabled = false;
-    btn.textContent = 'Скачать соглашение';
-    btn.onclick = () => {
+// ===== Download helper =====
+async function triggerBrowserDownload(downloadUrl, fallbackName = 'agreement.pdf') {
+    // Try blob download first
+    try {
+        const res = await fetch(downloadUrl, { method: 'GET', credentials: 'omit' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
         const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.target = '_blank';
-        a.rel = 'noopener';
+        a.href = blobUrl;
+        a.download = fallbackName;
         document.body.appendChild(a);
         a.click();
         a.remove();
-    };
+
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        return true;
+    } catch (e) {
+        console.warn('Blob download failed, fallback to direct open:', e);
+    }
+
+    // Fallback: direct open
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return false;
 }
 
+// ===== Submit / Webhook =====
 async function handleSubmit(e) {
     e.preventDefault();
 
@@ -423,8 +441,23 @@ async function handleSubmit(e) {
             throw new Error('n8n не вернул downloadUrl');
         }
 
-        setFinalButtonAsDownloadUrl(webhookResult.downloadUrl);
-        alert('Документ готов. Нажмите "Скачать соглашение".');
+        submitBtn.textContent = 'Скачиваем документ...';
+
+        // Auto-download immediately when link arrives
+        await triggerBrowserDownload(
+            webhookResult.downloadUrl,
+            `${formData.iin || 'agreement'}.pdf`
+        );
+
+        // Keep button for manual re-download
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Скачать соглашение ещё раз';
+        submitBtn.onclick = () => {
+            triggerBrowserDownload(
+                webhookResult.downloadUrl,
+                `${formData.iin || 'agreement'}.pdf`
+            );
+        };
     } catch (error) {
         console.error('Error:', error);
         alert('Произошла ошибка: ' + error.message);
@@ -453,11 +486,12 @@ async function sendToWebhook(formData) {
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Ошибка сервера: ${response.status}`);
+                    const errText = await response.text();
+                    throw new Error(`Ошибка сервера ${response.status}: ${errText}`);
                 }
 
                 const result = await response.json();
-                resolve(result); // ожидается { downloadUrl: "..." }
+                resolve(result); // expected: { downloadUrl: "..." }
             } catch (error) {
                 reject(new Error('Не удалось отправить данные: ' + error.message));
             }
