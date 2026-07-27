@@ -602,7 +602,6 @@ async function handleSubmit(e) {
 
     if (submissionState !== 'idle') return;
 
-    // Validate all fields
     if (!validateAllFields()) {
         alert('Пожалуйста, исправьте ошибки в форме');
         return;
@@ -617,7 +616,6 @@ async function handleSubmit(e) {
     submitBtn.textContent = 'Отправляем данные…';
 
     try {
-        // Get form data
         const formData = {
             fio: fio,
             birthdate: document.getElementById('birthdate').value,
@@ -642,6 +640,65 @@ async function handleSubmit(e) {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Скачать соглашение';
     }
+}
+function setFinalButtonAsDownload(docName, fileId) {
+    const btn = document.querySelector('.btn-submit');
+    btn.type = 'button';
+    btn.disabled = false;
+    btn.textContent = 'Скачать соглашение';
+    btn.onclick = () => {
+        downloadDriveFile(fileId, docName).catch(err => {
+            console.error(err);
+            alert('Не удалось скачать документ: ' + err.message);
+        });
+    };
+}
+
+async function downloadDriveFile(fileId, fileName = 'agreement.docx') {
+    if (!accessToken) {
+        throw new Error('Нет токена Google. Авторизуйтесь и попробуйте снова.');
+    }
+
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    if (!resp.ok) {
+        throw new Error('Не удалось скачать документ из Google Drive');
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function waitForDocumentInFolder(folderId, targetFileName, timeoutMs = 180000, intervalMs = 5000) {
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+        const response = await gapi.client.drive.files.list({
+            q: `name='${targetFileName}' and '${folderId}' in parents and trashed=false`,
+            fields: 'files(id,name,mimeType,modifiedTime)',
+            spaces: 'drive',
+            pageSize: 10,
+            orderBy: 'modifiedTime desc'
+        });
+
+        const files = response.result.files || [];
+        if (files.length > 0) {
+            return files[0];
+        }
+
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+
+    throw new Error(`Документ "${targetFileName}" не появился за ${Math.floor(timeoutMs / 1000)} сек`);
 }
 
 // Upload signature to side server (Railway)
