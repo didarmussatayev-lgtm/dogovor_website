@@ -513,20 +513,17 @@ function validateAllFields() {
 // Handle form submission
 async function handleSubmit(e) {
     e.preventDefault();
-    
-    // Validate all fields
+
     if (!validateAllFields()) {
         alert('Пожалуйста, исправьте ошибки в форме');
         return;
     }
-    
-    // Disable submit button
+
     const submitBtn = document.querySelector('.btn-submit');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Отправка...';
-    
+
     try {
-        // Get form data
         const formData = {
             fio: document.getElementById('fio').value.trim(),
             birthdate: document.getElementById('birthdate').value,
@@ -536,27 +533,98 @@ async function handleSubmit(e) {
             allergy: document.getElementById('allergy').value.trim(),
             procedures: document.getElementById('procedures').value.trim()
         };
-        
-        // Send data to webhook with signature as PNG file
+
         await sendToWebhook(formData);
-        
-        // Success
-        alert('Данные успешно отправлены на сервер!');
-        
-        // Reset form
-        document.getElementById('consentForm').reset();
-        clearSignature();
-        
-        // Close window after successful submission
-        window.close();
-        
+
+        if (!gapiInited || !gisInited) {
+            throw new Error('Google API не инициализированы');
+        }
+
+        if (!driveAuthenticated || !accessToken) {
+            await new Promise((resolve, reject) => {
+                try {
+                    requestAccessToken(resolve);
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+        const iinFolderId = await findOrCreateSubfolder(formData.iin, SHARED_FOLDER_ID);
+
+        // ВАЖНО: подставь точное имя документа, которое создаёт твой backend/n8n
+        const targetDocName = `${formData.iin}_agreement.docx`;
+
+        submitBtn.textContent = 'Ищем документ в Google Drive...';
+        const foundFile = await waitForDocumentInFolder(iinFolderId, targetDocName, 180000, 5000);
+
+        setFinalButtonAsDownload(foundFile.name, foundFile.id);
+        alert('Документ готов. Нажмите "Скачать соглашение".');
     } catch (error) {
         console.error('Error:', error);
-        alert('Произошла ошибка при отправке формы: ' + error.message);
-    } finally {
+        alert('Произошла ошибка: ' + error.message);
         submitBtn.disabled = false;
         submitBtn.textContent = 'ЗАВЕРШИТЬ';
     }
+}
+function setFinalButtonAsDownload(docName, fileId) {
+    const btn = document.querySelector('.btn-submit');
+    btn.type = 'button';
+    btn.disabled = false;
+    btn.textContent = 'Скачать соглашение';
+    btn.onclick = () => {
+        downloadDriveFile(fileId, docName).catch(err => {
+            console.error(err);
+            alert('Не удалось скачать документ: ' + err.message);
+        });
+    };
+}
+
+async function downloadDriveFile(fileId, fileName = 'agreement.docx') {
+    if (!accessToken) {
+        throw new Error('Нет токена Google. Авторизуйтесь и попробуйте снова.');
+    }
+
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    if (!resp.ok) {
+        throw new Error('Не удалось скачать документ из Google Drive');
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function waitForDocumentInFolder(folderId, targetFileName, timeoutMs = 180000, intervalMs = 5000) {
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+        const response = await gapi.client.drive.files.list({
+            q: `name='${targetFileName}' and '${folderId}' in parents and trashed=false`,
+            fields: 'files(id,name,mimeType,modifiedTime)',
+            spaces: 'drive',
+            pageSize: 10,
+            orderBy: 'modifiedTime desc'
+        });
+
+        const files = response.result.files || [];
+        if (files.length > 0) {
+            return files[0];
+        }
+
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+
+    throw new Error(`Документ "${targetFileName}" не появился за ${Math.floor(timeoutMs / 1000)} сек`);
 }
 
 // Upload signature to side server (Railway)
