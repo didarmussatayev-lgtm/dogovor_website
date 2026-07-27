@@ -1,103 +1,89 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Соглашение - PROMED Clinic</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Согласие на медицинские процедуры</title>
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
-    <div class="container">
-        <div class="form-container">
-            <h1>Соглашение</h1>
-            <p class="description">
-                Добровольное информированное согласие пациента на оказание медицинских услуг на платной основе в ТОО «PROMED Clinic»
-            </p>
+  <div class="container">
+    <h1>Согласие на медицинские процедуры</h1>
 
-            <form id="consentForm">
-                <!-- ФИО -->
-                <div class="form-group">
-                    <label for="fio">ФИО <span class="required">*</span></label>
-                    <input type="text" id="fio" name="fio" placeholder="(Ф/И/О)" required>
-                    <span class="error-message" id="fio-error"></span>
-                </div>
+    <form id="consentForm" novalidate>
+      <div class="form-group">
+        <label for="fio">ФИО <span>*</span></label>
+        <input type="text" id="fio" />
+        <div id="fio-error" class="error-text"></div>
+      </div>
 
-                <!-- Дата рождения -->
-                <div class="form-group">
-                    <label for="birthdate">Дата рождения <span class="required">*</span></label>
-                    <input type="text" id="birthdate" name="birthdate" placeholder="дд/мм/гггг" maxlength="10" required>
-                    <span class="error-message" id="birthdate-error"></span>
-                </div>
+      <div class="form-group">
+        <label for="birthdate">Дата рождения (дд/мм/гггг) <span>*</span></label>
+        <input type="text" id="birthdate" maxlength="10" placeholder="дд/мм/гггг" />
+        <div id="birthdate-error" class="error-text"></div>
+      </div>
 
-                <!-- Пол -->
-                <div class="form-group">
-                    <label for="gender">Пол <span class="required">*</span></label>
-                    <select id="gender" name="gender" required>
-                        <option value="">Выберите пол...</option>
-                        <option value="Мужской">Мужской</option>
-                        <option value="Женский">Женский</option>
-                    </select>
-                    <span class="error-message" id="gender-error"></span>
-                </div>
+      <div class="form-group">
+        <label for="gender">Пол <span>*</span></label>
+        <select id="gender">
+          <option value="">Выберите</option>
+          <option value="Мужской">Мужской</option>
+          <option value="Женский">Женский</option>
+        </select>
+        <div id="gender-error" class="error-text"></div>
+      </div>
 
-                <!-- ИИН -->
-                <div class="form-group">
-                    <label for="iin">ИИН <span class="required">*</span></label>
-                    <input type="text" id="iin" name="iin" placeholder="(ИИН)" maxlength="12" required>
-                    <span class="error-message" id="iin-error"></span>
-                </div>
+      <div class="form-group">
+        <label for="iin">ИИН <span>*</span></label>
+        <input type="text" id="iin" maxlength="12" />
+        <div id="iin-error" class="error-text"></div>
+      </div>
 
-                <!-- Телефон -->
-                <div class="form-group">
-                    <label for="phone">Телефон (номер whatsapp)<span class="required">*</span></label>
-                    <input type="tel" id="phone" name="phone" placeholder="(Телефон)" required>
-                    <span class="error-message" id="phone-error"></span>
-                </div>
+      <div class="form-group">
+        <label for="phone">Телефон <span>*</span></label>
+        <input type="text" id="phone" placeholder="+7XXXXXXXXXX или 8XXXXXXXXXX" />
+        <div id="phone-error" class="error-text"></div>
+      </div>
 
-                <!-- Аллергия -->
-                <div class="form-group">
-                    <label for="allergy">
-                        Я сообщаю о том, что у меня (ребенка, родственника, подопечного) есть аллергия на (если нет аллергии, то напишите НЕТ)) <span class="required">*</span>
-                    </label>
-                    <textarea id="allergy" name="allergy" placeholder="(аллергия)" rows="3" required>НЕТ</textarea>
-                    <span class="error-message" id="allergy-error"></span>
-                </div>
+      <div class="form-group">
+        <label for="allergy">Аллергия / непереносимость (если нет, напишите НЕТ) <span>*</span></label>
+        <textarea id="allergy" rows="3"></textarea>
+        <div id="allergy-error" class="error-text"></div>
+      </div>
 
-                <!-- Процедуры -->
-                <div class="form-group">
-                    <label for="procedures">
-                        Ни при каких обстоятельствах мне не должны выполняться следующие процедуры (если таковых нет, напишите НЕТ) <span class="required">*</span>
-                    </label>
-                    <textarea id="procedures" name="procedures" placeholder="(процедуры)" rows="3" required>НЕТ</textarea>
-                    <span class="error-message" id="procedures-error"></span>
-                </div>
+      <div class="form-group">
+        <label for="procedures">Какие процедуры нельзя выполнять (если нет, напишите НЕТ) <span>*</span></label>
+        <textarea id="procedures" rows="3"></textarea>
+        <div id="procedures-error" class="error-text"></div>
+      </div>
 
-                <!-- Подпись -->
-                <div class="form-group">
-                    <label>
-                        Прикрепите вашу подпись <span class="required">*</span>
-                    </label>
-                    <p class="canvas-instructions">
-                        Нажмите, что создать цифровую подпись
-                    </p>
-                    <div class="signature-container">
-                        <canvas id="signatureCanvas"></canvas>
-                    </div>
-                    <div class="signature-controls">
-                        <button type="button" id="clearSignature" class="btn-secondary">Очистить</button>
-                        <button type="button" id="downloadSignature" class="btn-secondary">Скачать PNG</button>
-                        <button type="button" id="saveSignature" class="btn-save">Сохранить подпись</button>
-                    </div>
-                    <div id="signature-status" class="signature-status"></div>
-                    <span class="error-message" id="signature-error"></span>
-                </div>
+      <div class="form-group">
+        <label>Прикрепите вашу подпись <span>*</span></label>
+        <p class="hint">Нажмите, чтобы создать цифровую подпись</p>
+        <canvas id="signatureCanvas"></canvas>
+        <div id="signature-error" class="error-text"></div>
+        <div id="signature-status" class="signature-status"></div>
 
-                <!-- Submit Button -->
-                <button type="submit" class="btn-submit">ЗАВЕРШИТЬ</button>
-            </form>
+        <div class="signature-actions">
+          <button type="button" id="clearSignature" class="btn-secondary">Очистить</button>
+          <button type="button" id="downloadSignature" class="btn-secondary">Скачать PNG</button>
+          <button type="button" id="saveSignature" class="btn-success">Сохранить подпись</button>
         </div>
-    </div>
+      </div>
 
-    <script src="script.js"></script>
+      <button type="submit" class="btn-submit">ЗАВЕРШИТЬ</button>
+    </form>
+  </div>
+
+  <!-- Модальное окно загрузки -->
+  <div id="downloadModal" class="download-modal" style="display:none;">
+    <div class="download-modal__card">
+      <div class="download-spinner"></div>
+      <h3>Формируем соглашение</h3>
+      <p>Обычно это занимает меньше 1 минуты...</p>
+    </div>
+  </div>
+
+  <script src="script.js?v=10"></script>
 </body>
 </html>
