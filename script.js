@@ -22,6 +22,14 @@ let ctx;
 let isDrawing = false;
 let hasSignature = false;
 
+// Download flow state
+let submissionState = 'idle'; // 'idle' | 'submitting' | 'polling' | 'not_found'
+let pendingFileName = null;
+
+// Polling settings: up to 20 attempts × 3 s = 60 s total
+const POLLING_MAX_ATTEMPTS = 20;
+const POLLING_INTERVAL_MS = 3000;
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeCanvas();
@@ -510,52 +518,129 @@ function validateAllFields() {
     return isValid;
 }
 
+// Search for a file by exact name in the shared Google Drive folder using the public API key
+async function searchDriveFile(fileName) {
+    const query = `name='${fileName}' and '${SHARED_FOLDER_ID}' in parents and trashed=false`;
+    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&key=${GOOGLE_API_KEY}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    return (data.files && data.files.length > 0) ? data.files[0] : null;
+}
+
+// Poll Google Drive until the file appears or the attempt limit is reached
+async function pollForFile(fileName, onStatusUpdate) {
+    for (let attempt = 1; attempt <= POLLING_MAX_ATTEMPTS; attempt++) {
+        onStatusUpdate(`Ищем документ… (${attempt}/${POLLING_MAX_ATTEMPTS})`);
+        try {
+            const file = await searchDriveFile(fileName);
+            if (file) return file;
+        } catch (err) {
+            console.warn(`Polling attempt ${attempt} failed:`, err);
+        }
+        if (attempt < POLLING_MAX_ATTEMPTS) {
+            await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_MS));
+        }
+    }
+    return null;
+}
+
+// Trigger browser download of the found file from Google Drive
+function downloadFileFromDrive(fileId, fileName) {
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = fileName;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+// Poll Drive for the pending file and download it when found
+async function pollAndDownload(submitBtn, fileName) {
+    submissionState = 'polling';
+    submitBtn.disabled = true;
+
+    const file = await pollForFile(fileName, (status) => {
+        submitBtn.textContent = status;
+    });
+
+    if (file) {
+        downloadFileFromDrive(file.id, fileName);
+
+        // Reset form for the next user
+        document.getElementById('consentForm').reset();
+        clearSignature();
+
+        submissionState = 'idle';
+        pendingFileName = null;
+        submitBtn.textContent = 'Скачать соглашение';
+        submitBtn.disabled = false;
+    } else {
+        submissionState = 'not_found';
+        submitBtn.textContent = 'Документ ещё не готов — нажмите для повтора';
+        submitBtn.disabled = false;
+    }
+}
+
 // Handle form submission
 async function handleSubmit(e) {
     e.preventDefault();
-    
+
+    const submitBtn = document.querySelector('.btn-submit');
+
+    // If a previous attempt timed out, retry polling without re-submitting the form
+    if (submissionState === 'not_found' && pendingFileName) {
+        await pollAndDownload(submitBtn, pendingFileName);
+        return;
+    }
+
+    if (submissionState !== 'idle') return;
+
     // Validate all fields
     if (!validateAllFields()) {
         alert('Пожалуйста, исправьте ошибки в форме');
         return;
     }
-    
-    // Disable submit button
-    const submitBtn = document.querySelector('.btn-submit');
+
+    const iin = document.getElementById('iin').value.trim();
+    const fio = document.getElementById('fio').value.trim();
+    pendingFileName = `${iin},${fio}.pdf`;
+
+    submissionState = 'submitting';
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Отправка...';
-    
+    submitBtn.textContent = 'Отправляем данные…';
+
     try {
         // Get form data
         const formData = {
-            fio: document.getElementById('fio').value.trim(),
+            fio: fio,
             birthdate: document.getElementById('birthdate').value,
             gender: document.getElementById('gender').value,
-            iin: document.getElementById('iin').value.trim(),
+            iin: iin,
             phone: document.getElementById('phone').value.trim(),
             allergy: document.getElementById('allergy').value.trim(),
             procedures: document.getElementById('procedures').value.trim()
         };
-        
-        // Send data to webhook with signature as PNG file
+
+        // Send data and signature to webhook
         await sendToWebhook(formData);
-        
-        // Success
-        alert('Данные успешно отправлены на сервер!');
-        
-        // Reset form
-        document.getElementById('consentForm').reset();
-        clearSignature();
-        
-        // Close window after successful submission
-        window.close();
-        
+
+        // Then poll Google Drive until the generated PDF appears
+        await pollAndDownload(submitBtn, pendingFileName);
+
     } catch (error) {
         console.error('Error:', error);
-        alert('Произошла ошибка при отправке формы: ' + error.message);
-    } finally {
+        alert('Произошла ошибка при отправке: ' + error.message);
+        submissionState = 'idle';
+        pendingFileName = null;
         submitBtn.disabled = false;
-        submitBtn.textContent = 'ЗАВЕРШИТЬ';
+        submitBtn.textContent = 'Скачать соглашение';
     }
 }
 
