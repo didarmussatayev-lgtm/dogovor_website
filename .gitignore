@@ -9,8 +9,10 @@ yarn.lock
 .env.local
 .env.*.local
 
-# Google OAuth tokens (sensitive!)
+# Google credentials (sensitive!)
 tokens.json
+service_account.json
+*_service_account.json
 
 # OS files
 .DS_Store
@@ -18,6 +20,7 @@ Thumbs.db
 
 # IDE files
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
@@ -34,6 +37,14 @@ build/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.mypy_cache/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
 
 # Test files
 *.test.js
