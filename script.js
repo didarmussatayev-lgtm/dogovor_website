@@ -1,13 +1,13 @@
 // API Configuration
 const GOOGLE_CLIENT_ID = '387713201223-raigbff4jiftmkkjt3o2volh5nl20b3h.apps.googleusercontent.com';
-const GOOGLE_API_KEY = 'AIzaSyBrUBlv-8jL3H4V7JCUmGGWW6xUQcBQxho';
+const GOOGLE_API_KEY = 'AIzaSyDCvcM08kZDIUT2WyEgg6tgK4WXJ--aIFU';
 const SCOPES = 'https://www.googleapis.com/auth/drive';
-const WEBHOOK_URL = 'https://primary-production-7d413.up.railway.app/webhook/promed';
+const WEBHOOK_URL = 'https://didarmussatayev-lgtm.github.io/dogovor_website/';
 // Production webhook URL (uncomment to use):
-// const WEBHOOK_URL = 'https://primary-production-7d413.up.railway.app/webhook/promed';
+// const WEBHOOK_URL = 'https://didarmussatayev-lgtm.github.io/dogovor_website/';
 
 // Shared Google Drive folder ID
-const SHARED_FOLDER_ID = '1DuWIUyPbdpW3uqg11xDTXsc-UHQ5aVX6';
+const SHARED_FOLDER_ID = '1am2_QQ70rJ03PdTG5Oj1P7DzxEcMhhqt';
 
 // Google API state
 let gapiInited = false;
