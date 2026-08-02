@@ -72,16 +72,15 @@ Update your Google Cloud Console:
 ## Step 4: Test Your Live Website
 
 1. Visit your Railway URL
-2. Fill in the form
-3. Save signature - sign in with **promedkaraganda@gmail.com**
-4. Submit form - data goes to your n8n webhook
+2. Fill in the form (ФИО, телефон, ИИН, аллергия, подпись)
+3. Check the consent checkbox and click «ЗАВЕРШИТЬ»
+4. The backend generates the document and returns it as a PDF download
 
 ## 🎯 Your Deployed Website Will:
-- ✅ Work as a static website
-- ✅ Accept form submissions
-- ✅ Upload signatures to Google Drive
-- ✅ Send data to n8n webhook
-- ✅ Be accessible from anywhere
+- ✅ Work as a static website (GitHub Pages)
+- ✅ Accept form submissions and generate PDF documents server-side
+- ✅ Upload agreements (DOCX + PDF) to Google Drive automatically
+- ✅ Return the PDF directly to the user for download
 
 ## Troubleshooting
 
