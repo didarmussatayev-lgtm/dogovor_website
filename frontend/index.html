@@ -32,11 +32,36 @@
         <div id="iin-error" class="error-text"></div>
       </div>
 
+      <!-- Дата рождения -->
+      <div class="form-group">
+        <label for="birthDate">Дата рождения <span class="required">*</span></label>
+        <input type="date" id="birthDate" />
+        <div id="birth-date-error" class="error-text"></div>
+      </div>
+
+      <!-- Пол -->
+      <div class="form-group">
+        <label for="gender">Пол <span class="required">*</span></label>
+        <select id="gender">
+          <option value="">Выберите пол</option>
+          <option value="male">Мужской</option>
+          <option value="female">Женский</option>
+        </select>
+        <div id="gender-error" class="error-text"></div>
+      </div>
+
       <!-- Аллергия -->
       <div class="form-group">
         <label for="allergy">Аллергия / непереносимость <span class="required">*</span></label>
         <textarea id="allergy" rows="3" placeholder="Укажите аллергии или напишите НЕТ"></textarea>
         <div id="allergy-error" class="error-text"></div>
+      </div>
+
+      <!-- Ограничения по процедурам -->
+      <div class="form-group">
+        <label for="procedure">Ни при каких обстоятельствах мне не должны выполняться следующие процедуры <span class="required">*</span></label>
+        <textarea id="procedure" rows="3" placeholder="Перечислите процедуры или напишите НЕТ"></textarea>
+        <div id="procedure-error" class="error-text"></div>
       </div>
 
       <!-- Подпись -->

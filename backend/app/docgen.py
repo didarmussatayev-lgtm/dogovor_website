@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import base64
 import logging
-import os
 import subprocess
-import tempfile
 from datetime import date
-from io import BytesIO
 from pathlib import Path
 
 from docxtpl import DocxTemplate, InlineImage
@@ -27,9 +24,13 @@ def generate_docx(
     full_name: str,
     phone: str,
     iin: str,
+    birth_date: str,
+    gender_display: str,
     allergy: str,
+    procedure: str,
     signature_base64: str,
     agreement_id: str,
+    output_basename: str,
     output_dir: str | Path,
 ) -> Path:
     """Fill the DOCX template and return the path to the generated file."""
@@ -44,7 +45,12 @@ def generate_docx(
         "full_name": full_name,
         "phone": phone,
         "iin": iin,
+        "birth_date": birth_date,
+        "Дата рождения": birth_date,
+        "gender": gender_display,
+        "пол": gender_display,
         "allergy": allergy,
+        "procedure": procedure,
         "date": date.today().strftime("%d.%m.%Y"),
         "agreement_id": agreement_id,
         "signature": InlineImage(tpl, str(sig_tmp), width=Mm(50)),
@@ -52,7 +58,7 @@ def generate_docx(
 
     tpl.render(context)
 
-    docx_path = Path(output_dir) / f"{agreement_id}.docx"
+    docx_path = Path(output_dir) / f"{output_basename}.docx"
     tpl.save(str(docx_path))
     logger.info("DOCX generated: %s", docx_path)
     return docx_path

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import tempfile
 import uuid
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from fastapi.responses import FileResponse
 
 from .config import settings
 from .docgen import convert_to_pdf, generate_docx
-from .drive import upload_files
+from .drive import upload_zip
 from .models import AgreementRequest
 
 logging.basicConfig(
@@ -41,52 +43,92 @@ def health() -> dict:
 @app.post("/api/v1/agreements")
 async def create_agreement(body: AgreementRequest):
     """
-    Accept form data, generate DOCX+PDF, upload to Google Drive,
-    and return the PDF to the client as a downloadable file.
+    Accept form data, generate DOCX+PDF set, upload only ZIP to Google Drive,
+    and return the ZIP to the client as a downloadable file.
     """
     agreement_id = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"
     logger.info("Processing agreement %s for %s", agreement_id, body.full_name)
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="agreement_"))
     try:
-        # 1. Generate DOCX
-        template_path = Path(settings.template_path)
-        if not template_path.exists():
-            logger.error("Template not found: %s", template_path)
-            raise HTTPException(
-                status_code=500,
-                detail="Document template not found on server. Please contact support.",
-            )
+        # 1. Pick templates by business rule
+        template_dir = Path(settings.template_path).parent
+        template_candidates = {
+            "general": ["soglasie_template_general.docx", "soglasie_template general.docx"],
+            "invasia": ["soglasie_template_invasia.docx", "soglasie_template invasia.docx"],
+            "pregnant": ["soglasie_template_pregnant.docx", "soglasie_template pregnant.docx"],
+        }
+        template_keys = ["general", "invasia"]
+        if body.gender == "female":
+            template_keys.append("pregnant")
 
-        try:
-            docx_path = generate_docx(
-                template_path=template_path,
-                full_name=body.full_name,
-                phone=body.phone,
-                iin=body.iin,
-                allergy=body.allergy,
-                signature_base64=body.signature_base64,
-                agreement_id=agreement_id,
-                output_dir=tmp_dir,
-            )
-        except Exception as exc:
-            logger.exception("DOCX generation failed")
-            raise HTTPException(status_code=500, detail=f"Document generation failed: {exc}") from exc
+        selected_templates: list[tuple[str, Path]] = []
+        for key in template_keys:
+            resolved: Path | None = None
+            for candidate in template_candidates[key]:
+                path = template_dir / candidate
+                if path.exists():
+                    resolved = path
+                    break
+            if not resolved:
+                logger.error("Template not found for key '%s' in %s", key, template_dir)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Document template not found for '{key}'. Please contact support.",
+                )
+            selected_templates.append((key, resolved))
 
-        # 2. Convert to PDF
-        try:
-            pdf_path = convert_to_pdf(docx_path, tmp_dir)
-        except Exception as exc:
-            logger.exception("PDF conversion failed")
-            raise HTTPException(status_code=500, detail=f"PDF conversion failed: {exc}") from exc
+        birth_date_text = body.birth_date.strftime("%d.%m.%Y")
+        gender_display = "Женский" if body.gender == "female" else "Мужской"
 
-        # 3. Upload to Google Drive (best-effort — don't fail the request on Drive error)
+        # 2. Generate DOCX and convert each one to PDF
+        docx_paths: list[Path] = []
+        pdf_paths: list[Path] = []
+        for template_key, template_path in selected_templates:
+            output_basename = f"{agreement_id}_{template_key}"
+            try:
+                docx_path = generate_docx(
+                    template_path=template_path,
+                    full_name=body.full_name,
+                    phone=body.phone,
+                    iin=body.iin,
+                    birth_date=birth_date_text,
+                    gender_display=gender_display,
+                    allergy=body.allergy,
+                    procedure=body.procedure,
+                    signature_base64=body.signature_base64,
+                    agreement_id=agreement_id,
+                    output_basename=output_basename,
+                    output_dir=tmp_dir,
+                )
+            except Exception as exc:
+                logger.exception("DOCX generation failed for template '%s'", template_key)
+                raise HTTPException(status_code=500, detail=f"Document generation failed: {exc}") from exc
+
+            try:
+                pdf_path = convert_to_pdf(docx_path, tmp_dir)
+            except Exception as exc:
+                logger.exception("PDF conversion failed for template '%s'", template_key)
+                raise HTTPException(status_code=500, detail=f"PDF conversion failed: {exc}") from exc
+
+            docx_paths.append(docx_path)
+            pdf_paths.append(pdf_path)
+
+        # 3. Build ZIP with generated DOCX and PDF files
+        safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", body.full_name)[:40] or "patient"
+        zip_name = f"soglasie_{agreement_id}_{safe_name}.zip"
+        zip_path = tmp_dir / zip_name
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for generated_file in [*docx_paths, *pdf_paths]:
+                archive.write(generated_file, arcname=generated_file.name)
+        logger.info("ZIP generated: %s", zip_path)
+
+        # 4. Upload ZIP to Google Drive (best-effort — don't fail the request on Drive error)
         drive_error: str | None = None
         if settings.google_drive_folder_id:
             try:
-                upload_files(
-                    docx_path=docx_path,
-                    pdf_path=pdf_path,
+                upload_zip(
+                    zip_path=zip_path,
                     folder_id=settings.google_drive_folder_id,
                     agreement_id=agreement_id,
                     full_name=body.full_name,
@@ -100,24 +142,15 @@ async def create_agreement(body: AgreementRequest):
         else:
             logger.warning("GOOGLE_DRIVE_FOLDER_ID not set — skipping Drive upload")
 
-        # 4. Return PDF to client
-        # Sanitize name: keep only word chars to prevent path injection
-        import re as _re
-        safe_name = _re.sub(r"[^\w]", "_", body.full_name)[:40]
-        filename = f"soglasie_{agreement_id}_{safe_name}.pdf"
-
+        # 5. Return ZIP to client
         headers: dict[str, str] = {}
         if drive_error:
             headers["X-Drive-Error"] = drive_error[:200]
 
-        # Copy PDF to a fixed name inside the temp dir (never derived from raw user input)
-        stable_pdf = tmp_dir / f"{agreement_id}_output.pdf"
-        shutil.copy2(pdf_path, stable_pdf)
-
         return FileResponse(
-            path=str(stable_pdf),
-            media_type="application/pdf",
-            filename=filename,
+            path=str(zip_path),
+            media_type="application/zip",
+            filename=zip_name,
             headers=headers,
             background=_cleanup_background(tmp_dir),
         )

@@ -1,7 +1,7 @@
 # Система электронных согласий — MVP
 
-Клиент сканирует QR-код → открывает форму на GitHub Pages → подписывает согласие → получает скачанный PDF.
-Бэкенд генерирует DOCX/PDF и загружает файлы в Google Drive.
+Клиент сканирует QR-код → открывает форму на GitHub Pages → подписывает согласие → получает скачанный ZIP.
+Бэкенд генерирует DOCX/PDF, упаковывает их в ZIP и загружает в Google Drive только ZIP.
 
 ---
 
@@ -22,7 +22,9 @@ backend/             # FastAPI (Docker)
     docgen.py        # DOCX → PDF (LibreOffice)
     drive.py         # Google Drive upload
     templates/
-      soglasie_template.docx
+      soglasie_template_general.docx
+      soglasie_template_invasia.docx
+      soglasie_template_pregnant.docx
   Dockerfile
   requirements.txt
   .env.example
@@ -33,15 +35,16 @@ backend/             # FastAPI (Docker)
 
 ## Быстрый старт (локально)
 
-### 1. Подготовить DOCX-шаблон
+### 1. Подготовить DOCX-шаблоны
 
-Если шаблон ещё не создан:
+В папке `backend/app/templates` должны быть 3 шаблона:
+- `soglasie_template_general.docx`
+- `soglasie_template_invasia.docx`
+- `soglasie_template_pregnant.docx`
 
-```bash
-cd backend
-pip install python-docx
-python create_template.py
-```
+Правило генерации:
+- `general` и `invasia` — всегда
+- `pregnant` — только при поле `gender=female`
 
 ### 2. Настроить переменные окружения
 
@@ -135,12 +138,12 @@ const BACKEND_URL = 'https://your-app.up.railway.app';
 ## Проверка end-to-end
 
 1. Откройте форму на GitHub Pages (или `http://localhost:5500`).
-2. Заполните ФИО, телефон (+7 (7XX) XXX-XX-XX), ИИН (12 цифр), аллергию.
+2. Заполните ФИО, телефон (+7 (7XX) XXX-XX-XX), ИИН (12 цифр), дату рождения, пол, аллергию и ограничения по процедурам.
 3. Нарисуйте подпись.
 4. Отметьте чекбокс согласия — кнопка «Завершить» станет активной.
 5. Нажмите «Завершить» — появится индикатор загрузки.
-6. Браузер автоматически скачает `soglasie_<id>_<ФИО>.pdf`.
-7. В папке Google Drive появятся файлы `.docx` и `.pdf`.
+6. Браузер автоматически скачает `soglasie_<id>_<name>.zip`.
+7. В папке Google Drive появится только ZIP-файл (без отдельных `.docx`/`.pdf`).
 
 Проверить здоровье API:
 
@@ -171,5 +174,4 @@ curl https://your-app.up.railway.app/health
 | `GOOGLE_DRIVE_FOLDER_ID` | ID папки на Drive | `1BxiM...` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | JSON сервис-аккаунта строкой | `{"type":"service_account",...}` |
 | `GOOGLE_SERVICE_ACCOUNT_FILE` | Путь к JSON файлу сервис-аккаунта | `service_account.json` |
-| `TEMPLATE_PATH` | Путь к DOCX-шаблону | `app/templates/soglasie_template.docx` |
-
+| `TEMPLATE_PATH` | Путь к любому шаблону внутри `app/templates` (используется для определения директории шаблонов) | `app/templates/soglasie_template_general.docx` |

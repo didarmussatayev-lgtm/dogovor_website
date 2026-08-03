@@ -106,7 +106,10 @@ function initFormListeners() {
   document.getElementById('phone')?.addEventListener('input', handlePhoneInput);
   document.getElementById('iin')?.addEventListener('input', handleIINInput);
   document.getElementById('fio')?.addEventListener('input', () => { validateFIO(); updateSubmitState(); });
+  document.getElementById('birthDate')?.addEventListener('change', () => { validateBirthDate(); updateSubmitState(); });
+  document.getElementById('gender')?.addEventListener('change', () => { validateGender(); updateSubmitState(); });
   document.getElementById('allergy')?.addEventListener('input', () => { validateAllergy(); updateSubmitState(); });
+  document.getElementById('procedure')?.addEventListener('input', () => { validateProcedure(); updateSubmitState(); });
   document.getElementById('consentCheckbox')?.addEventListener('change', () => {
     setError('consent-error', '');
     updateSubmitState();
@@ -117,8 +120,20 @@ function initFormListeners() {
 function updateSubmitState() {
   const btn = document.getElementById('submitBtn');
   if (!btn) return;
+  const requiredFilled = isRequiredFilled();
   const consentChecked = document.getElementById('consentCheckbox')?.checked ?? false;
-  btn.disabled = !(consentChecked && hasSignature);
+  btn.disabled = !(requiredFilled && consentChecked && hasSignature);
+}
+
+function isRequiredFilled() {
+  const fio = document.getElementById('fio')?.value.trim() ?? '';
+  const phone = document.getElementById('phone')?.value.trim() ?? '';
+  const iin = document.getElementById('iin')?.value.trim() ?? '';
+  const birthDate = document.getElementById('birthDate')?.value ?? '';
+  const gender = document.getElementById('gender')?.value ?? '';
+  const allergy = document.getElementById('allergy')?.value.trim() ?? '';
+  const procedure = document.getElementById('procedure')?.value.trim() ?? '';
+  return !!(fio && phone && iin && birthDate && gender && allergy && procedure);
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -168,6 +183,33 @@ function validateAllergy() {
   return true;
 }
 
+function validateProcedure() {
+  const val = document.getElementById('procedure')?.value.trim() ?? '';
+  if (!val) { setFieldError('procedure', 'procedure-error', 'Заполните поле или напишите НЕТ'); return false; }
+  setFieldError('procedure', 'procedure-error', '');
+  return true;
+}
+
+function validateBirthDate() {
+  const val = document.getElementById('birthDate')?.value ?? '';
+  if (!val) { setFieldError('birthDate', 'birth-date-error', 'Введите дату рождения'); return false; }
+  const chosen = new Date(val);
+  const now = new Date();
+  if (Number.isNaN(chosen.getTime()) || chosen > now) {
+    setFieldError('birthDate', 'birth-date-error', 'Дата рождения не может быть в будущем');
+    return false;
+  }
+  setFieldError('birthDate', 'birth-date-error', '');
+  return true;
+}
+
+function validateGender() {
+  const val = document.getElementById('gender')?.value ?? '';
+  if (!val) { setFieldError('gender', 'gender-error', 'Выберите пол'); return false; }
+  setFieldError('gender', 'gender-error', '');
+  return true;
+}
+
 function validateConsent() {
   const checked = document.getElementById('consentCheckbox')?.checked ?? false;
   setError('consent-error', checked ? '' : 'Необходимо дать согласие на обработку персональных данных');
@@ -183,10 +225,13 @@ function validateAll() {
   const a = validateFIO();
   const b = validatePhone();
   const c = validateIIN();
-  const d = validateAllergy();
-  const e = validateConsent();
-  const f = validateSignature();
-  return a && b && c && d && e && f;
+  const d = validateBirthDate();
+  const e = validateGender();
+  const f = validateAllergy();
+  const g = validateProcedure();
+  const h = validateConsent();
+  const i = validateSignature();
+  return a && b && c && d && e && f && g && h && i;
 }
 
 // ─── Phone mask ───────────────────────────────────────────────────────────────
@@ -235,7 +280,10 @@ async function handleSubmit(e) {
     full_name: document.getElementById('fio').value.trim(),
     phone: document.getElementById('phone').value.trim(),
     iin: document.getElementById('iin').value.trim(),
+    birth_date: document.getElementById('birthDate').value,
+    gender: document.getElementById('gender').value,
     allergy: document.getElementById('allergy').value.trim(),
+    procedure: document.getElementById('procedure').value.trim(),
     signature_base64: getSignatureBase64(),
   };
 
@@ -257,14 +305,14 @@ async function handleSubmit(e) {
       throw new Error(detail);
     }
 
-    // Download the PDF blob
+    // Download the ZIP blob
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     const disposition = response.headers.get('Content-Disposition') ?? '';
     const match = disposition.match(/filename[^;=\n]*=(['"]?)([^'";\n]+)\1/);
-    a.download = match ? match[2] : 'soglasie.pdf';
+    a.download = match ? match[2] : 'soglasie.zip';
     document.body.appendChild(a);
     a.click();
     a.remove();
