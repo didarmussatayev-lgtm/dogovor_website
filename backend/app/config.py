@@ -26,10 +26,15 @@ class Settings(BaseSettings):
 
     # Google Drive
     google_drive_folder_id: str = ""
-    # Inline JSON string of the service-account key (takes precedence over file path)
+
+    # --- Service-account auth (kept for backward compatibility / Shared Drives) ---
     google_service_account_json: str = ""
-    # Path to the service-account JSON file (used when the above is empty)
     google_service_account_file: str = "service_account.json"
+
+    # --- OAuth user-delegated auth (required for personal Gmail Drive quota) ---
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_refresh_token: str = ""
 
     # Template
     template_path: str = "app/templates/soglasie_template.docx"
@@ -50,6 +55,21 @@ class Settings(BaseSettings):
                 return json.loads(raw)
             except json.JSONDecodeError as exc:
                 logger.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON: %s", exc)
+        return None
+
+    @property
+    def oauth_credentials_info(self) -> dict | None:
+        """Return OAuth client info dict if all three OAuth vars are set, else None."""
+        if (
+            self.google_oauth_client_id.strip()
+            and self.google_oauth_client_secret.strip()
+            and self.google_oauth_refresh_token.strip()
+        ):
+            return {
+                "client_id": self.google_oauth_client_id.strip(),
+                "client_secret": self.google_oauth_client_secret.strip(),
+                "refresh_token": self.google_oauth_refresh_token.strip(),
+            }
         return None
 
 
