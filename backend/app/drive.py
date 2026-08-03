@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from pathlib import Path
 from typing import Optional
 
@@ -62,38 +63,54 @@ def _build_service(
     return build("drive", "v3", credentials=creds)
 
 
-def _safe_filename(full_name: str) -> str:
-    """Normalize a name for use in filenames."""
-    safe = re.sub(r"[^A-Za-z0-9_-]", "_", full_name.strip())
-    return (safe or "patient")[:50]
+def _safe_filename(value: str) -> str:
+    """Normalize a string for safe and readable filenames."""
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    normalized = re.sub(r"[\x00-\x1f\x7f]+", "", normalized)
+    normalized = re.sub(r'[\\/:*?"<>|]+', " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = re.sub(r"[^\w .()\-]", "", normalized, flags=re.UNICODE)
+    normalized = normalized.replace(" ", "_")
+    return (normalized or "patient")[:80]
 
 
-def upload_zip(
-    zip_path: Path,
+def build_patient_filename_base(iin: str, full_name: str) -> str:
+    safe_iin = _safe_filename(iin)
+    safe_name = _safe_filename(full_name)
+    return f"{safe_iin}_{safe_name}"
+
+
+def upload_documents(
+    file_paths: list[Path],
     folder_id: str,
-    agreement_id: str,
+    iin: str,
     full_name: str,
     service_account_info: Optional[dict] = None,
     service_account_file: Optional[str] = None,
     oauth_credentials_info: Optional[dict] = None,
 ) -> dict:
     """
-    Upload ZIP file to Google Drive.
-    Returns a dict with file ID: {"zip_id": ...}
+    Upload generated documents to Google Drive.
+    Returns a dict with uploaded file IDs by filename.
     Raises RuntimeError on failure.
     """
     service = _build_service(service_account_info, service_account_file, oauth_credentials_info)
-    safe_name = _safe_filename(full_name)
-    file_name = f"{agreement_id}_{safe_name}.zip"
-    metadata = {
-        "name": file_name,
-        "parents": [folder_id] if folder_id else [],
-    }
-    media = MediaFileUpload(str(zip_path), mimetype="application/zip", resumable=False)
-    uploaded = (
-        service.files()
-        .create(body=metadata, media_body=media, fields="id,name")
-        .execute()
-    )
-    logger.info("Uploaded ZIP to Drive as %s (id=%s)", file_name, uploaded.get("id"))
-    return {"zip_id": uploaded.get("id")}
+    patient_base = build_patient_filename_base(iin, full_name)
+    uploaded_ids: dict[str, str] = {}
+    for file_path in file_paths:
+        suffix = _safe_filename(file_path.stem.split("_")[-1]) or "document"
+        extension = file_path.suffix.lower()
+        file_name = f"{patient_base}_{suffix}{extension}"
+        metadata = {
+            "name": file_name,
+            "parents": [folder_id] if folder_id else [],
+        }
+        media = MediaFileUpload(str(file_path), resumable=False)
+        uploaded = (
+            service.files()
+            .create(body=metadata, media_body=media, fields="id,name")
+            .execute()
+        )
+        logger.info("Uploaded file to Drive as %s (id=%s)", file_name, uploaded.get("id"))
+        uploaded_ids[file_name] = uploaded.get("id")
+    return uploaded_ids

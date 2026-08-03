@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import shutil
 import tempfile
 import uuid
@@ -15,7 +14,7 @@ from fastapi.responses import FileResponse
 
 from .config import settings
 from .docgen import convert_to_pdf, generate_docx
-from .drive import upload_zip
+from .drive import build_patient_filename_base, upload_documents
 from .models import AgreementRequest
 
 logging.basicConfig(
@@ -43,8 +42,8 @@ def health() -> dict:
 @app.post("/api/v1/agreements")
 async def create_agreement(body: AgreementRequest):
     """
-    Accept form data, generate DOCX+PDF set, upload only ZIP to Google Drive,
-    and return the ZIP to the client as a downloadable file.
+    Accept form data, generate DOCX+PDF set, upload DOCX+PDF to Google Drive,
+    and return PDF-only ZIP to the client as a downloadable file.
     """
     agreement_id = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"
     logger.info("Processing agreement %s for %s", agreement_id, body.full_name)
@@ -81,11 +80,13 @@ async def create_agreement(body: AgreementRequest):
         birth_date_text = body.birth_date.strftime("%d.%m.%Y")
         gender_display = "Женский" if body.gender == "female" else "Мужской"
 
+        patient_file_base = build_patient_filename_base(body.iin, body.full_name)
+
         # 2. Generate DOCX and convert each one to PDF
         docx_paths: list[Path] = []
         pdf_paths: list[Path] = []
         for template_key, template_path in selected_templates:
-            output_basename = f"{agreement_id}_{template_key}"
+            output_basename = f"{patient_file_base}_{template_key}"
             try:
                 docx_path = generate_docx(
                     template_path=template_path,
@@ -114,23 +115,22 @@ async def create_agreement(body: AgreementRequest):
             docx_paths.append(docx_path)
             pdf_paths.append(pdf_path)
 
-        # 3. Build ZIP with generated DOCX and PDF files
-        safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", body.full_name)[:40] or "patient"
-        zip_name = f"soglasie_{agreement_id}_{safe_name}.zip"
+        # 3. Build ZIP with generated PDF files only
+        zip_name = f"{patient_file_base}.zip"
         zip_path = tmp_dir / zip_name
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for generated_file in [*docx_paths, *pdf_paths]:
+            for generated_file in pdf_paths:
                 archive.write(generated_file, arcname=generated_file.name)
-        logger.info("ZIP generated: %s", zip_path)
+        logger.info("ZIP generated with %d PDF files: %s", len(pdf_paths), zip_path)
 
-        # 4. Upload ZIP to Google Drive (best-effort — don't fail the request on Drive error)
+        # 4. Upload DOCX+PDF files to Google Drive (best-effort — don't fail on Drive error)
         drive_error: str | None = None
         if settings.google_drive_folder_id:
             try:
-                upload_zip(
-                    zip_path=zip_path,
+                upload_documents(
+                    file_paths=[*docx_paths, *pdf_paths],
                     folder_id=settings.google_drive_folder_id,
-                    agreement_id=agreement_id,
+                    iin=body.iin,
                     full_name=body.full_name,
                     service_account_info=settings.service_account_info,
                     service_account_file=settings.google_service_account_file,
@@ -138,7 +138,7 @@ async def create_agreement(body: AgreementRequest):
                 )
             except Exception as exc:
                 drive_error = str(exc)
-                logger.error("Drive upload failed for %s: %s", agreement_id, exc)
+                logger.error("Drive upload failed for %s: %s", patient_file_base, exc)
         else:
             logger.warning("GOOGLE_DRIVE_FOLDER_ID not set — skipping Drive upload")
 
