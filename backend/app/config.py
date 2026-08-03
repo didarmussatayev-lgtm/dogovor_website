@@ -4,7 +4,6 @@ import json
 import logging
 from typing import List
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -38,6 +37,10 @@ class Settings(BaseSettings):
 
     # Template
     template_path: str = "app/templates/soglasie_template_general.docx"
+    template_dir: str = ""
+    template_general_filenames: str = "soglasie_template_general.docx,soglasie_template general.docx"
+    template_invasia_filenames: str = "soglasie_template_invasia.docx,soglasie_template invasia.docx"
+    template_pregnant_filenames: str = "soglasie_template_pregnant.docx,soglasie_template pregnant.docx"
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -71,6 +74,22 @@ class Settings(BaseSettings):
                 "refresh_token": self.google_oauth_refresh_token.strip(),
             }
         return None
+
+    @staticmethod
+    def _split_csv(value: str) -> List[str]:
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    @property
+    def template_general_filenames_list(self) -> List[str]:
+        return self._split_csv(self.template_general_filenames)
+
+    @property
+    def template_invasia_filenames_list(self) -> List[str]:
+        return self._split_csv(self.template_invasia_filenames)
+
+    @property
+    def template_pregnant_filenames_list(self) -> List[str]:
+        return self._split_csv(self.template_pregnant_filenames)
 
 
 settings = Settings()

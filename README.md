@@ -22,9 +22,9 @@ backend/             # FastAPI (Docker)
     docgen.py        # DOCX → PDF (LibreOffice)
     drive.py         # Google Drive upload
     templates/
-      soglasie_template_general.docx
-      soglasie_template_invasia.docx
-      soglasie_template_pregnant.docx
+      soglasie_template_general.docx (или soglasie_template general.docx)
+      soglasie_template_invasia.docx (или soglasie_template invasia.docx)
+      soglasie_template_pregnant.docx (или soglasie_template pregnant.docx)
   Dockerfile
   requirements.txt
   .env.example
@@ -41,6 +41,11 @@ backend/             # FastAPI (Docker)
 - `soglasie_template_general.docx`
 - `soglasie_template_invasia.docx`
 - `soglasie_template_pregnant.docx`
+
+Также поддерживаются варианты имён с пробелом:
+- `soglasie_template general.docx`
+- `soglasie_template invasia.docx`
+- `soglasie_template pregnant.docx`
 
 Правило генерации:
 - `general` и `invasia` — всегда
@@ -174,4 +179,8 @@ curl https://your-app.up.railway.app/health
 | `GOOGLE_DRIVE_FOLDER_ID` | ID папки на Drive | `1BxiM...` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | JSON сервис-аккаунта строкой | `{"type":"service_account",...}` |
 | `GOOGLE_SERVICE_ACCOUNT_FILE` | Путь к JSON файлу сервис-аккаунта | `service_account.json` |
+| `TEMPLATE_DIR` | Явный путь к директории шаблонов (опционально) | `backend/app/templates` |
 | `TEMPLATE_PATH` | Путь к любому шаблону внутри `app/templates` (используется для определения директории шаблонов) | `app/templates/soglasie_template_general.docx` |
+| `TEMPLATE_GENERAL_FILENAMES` | Имена файла(ов) для шаблона `general` через запятую | `soglasie_template_general.docx,soglasie_template general.docx` |
+| `TEMPLATE_INVASIA_FILENAMES` | Имена файла(ов) для шаблона `invasia` через запятую | `soglasie_template_invasia.docx,soglasie_template invasia.docx` |
+| `TEMPLATE_PREGNANT_FILENAMES` | Имена файла(ов) для шаблона `pregnant` через запятую | `soglasie_template_pregnant.docx,soglasie_template pregnant.docx` |

@@ -35,6 +35,44 @@ app.add_middleware(
 )
 
 
+def _candidate_paths(raw_path: str, app_dir: Path) -> list[Path]:
+    path = Path(raw_path)
+    if path.is_absolute():
+        return [path]
+    return [
+        Path.cwd() / path,
+        app_dir / path,
+        app_dir.parent / path,
+    ]
+
+
+def _resolve_template_dir() -> Path:
+    app_dir = Path(__file__).resolve().parent
+    candidates: list[Path] = []
+
+    if settings.template_dir.strip():
+        candidates.extend(_candidate_paths(settings.template_dir.strip(), app_dir))
+    if settings.template_path.strip():
+        candidates.extend(_candidate_paths(str(Path(settings.template_path).parent), app_dir))
+    candidates.append(app_dir / "templates")
+
+    seen: set[Path] = set()
+    checked: list[Path] = []
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        checked.append(resolved)
+        if resolved.is_dir():
+            logger.info("Using templates directory: %s", resolved)
+            return resolved
+
+    raise RuntimeError(
+        "Templates directory not found. Checked: " + ", ".join(str(path) for path in checked)
+    )
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -52,11 +90,18 @@ async def create_agreement(body: AgreementRequest):
     tmp_dir = Path(tempfile.mkdtemp(prefix="agreement_"))
     try:
         # 1. Pick templates by business rule
-        template_dir = Path(settings.template_path).parent
+        try:
+            template_dir = _resolve_template_dir()
+        except Exception as exc:
+            logger.error("Template directory resolution failed: %s", exc)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Template directory not found. {exc}",
+            ) from exc
         template_candidates = {
-            "general": ["soglasie_template_general.docx", "soglasie_template general.docx"],
-            "invasia": ["soglasie_template_invasia.docx", "soglasie_template invasia.docx"],
-            "pregnant": ["soglasie_template_pregnant.docx", "soglasie_template pregnant.docx"],
+            "general": settings.template_general_filenames_list,
+            "invasia": settings.template_invasia_filenames_list,
+            "pregnant": settings.template_pregnant_filenames_list,
         }
         template_keys = ["general", "invasia"]
         if body.gender == "female":
@@ -65,16 +110,27 @@ async def create_agreement(body: AgreementRequest):
         selected_templates: list[tuple[str, Path]] = []
         for key in template_keys:
             resolved: Path | None = None
+            checked_paths: list[str] = []
             for candidate in template_candidates[key]:
                 path = template_dir / candidate
+                checked_paths.append(str(path))
                 if path.exists():
                     resolved = path
                     break
             if not resolved:
-                logger.error("Template not found for key '%s' in %s", key, template_dir)
+                logger.error(
+                    "Template not found for key='%s'. candidates=%s checked_paths=%s",
+                    key,
+                    template_candidates[key],
+                    checked_paths,
+                )
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Document template not found for '{key}'. Please contact support.",
+                    detail=(
+                        f"Document template not found for key '{key}'. "
+                        f"Expected one of: {template_candidates[key]}. "
+                        f"Checked in: {template_dir}"
+                    ),
                 )
             selected_templates.append((key, resolved))
 

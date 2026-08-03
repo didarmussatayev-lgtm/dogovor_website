@@ -1,10 +1,13 @@
 # DOCX template files
 
-Place template binaries in this directory:
+Place template binaries in this directory (underscore and space variants are both supported):
 
 - `soglasie_template_general.docx`
+- `soglasie_template general.docx`
 - `soglasie_template_invasia.docx`
+- `soglasie_template invasia.docx`
 - `soglasie_template_pregnant.docx`
+- `soglasie_template pregnant.docx`
 
 Generation rules:
 
