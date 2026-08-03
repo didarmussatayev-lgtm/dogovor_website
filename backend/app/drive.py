@@ -64,12 +64,12 @@ def _build_service(
 
 def _safe_filename(full_name: str) -> str:
     """Normalize a name for use in filenames."""
-    return re.sub(r"[^\w\-]", "_", full_name.strip())[:50]
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", full_name.strip())
+    return (safe or "patient")[:50]
 
 
-def upload_files(
-    docx_path: Path,
-    pdf_path: Path,
+def upload_zip(
+    zip_path: Path,
     folder_id: str,
     agreement_id: str,
     full_name: str,
@@ -78,30 +78,22 @@ def upload_files(
     oauth_credentials_info: Optional[dict] = None,
 ) -> dict:
     """
-    Upload DOCX and PDF to Google Drive.
-    Returns a dict with file IDs: {"docx_id": ..., "pdf_id": ...}
+    Upload ZIP file to Google Drive.
+    Returns a dict with file ID: {"zip_id": ...}
     Raises RuntimeError on failure.
     """
     service = _build_service(service_account_info, service_account_file, oauth_credentials_info)
     safe_name = _safe_filename(full_name)
-    results = {}
-
-    for file_path, mime_type, ext in [
-        (docx_path, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
-        (pdf_path, "application/pdf", "pdf"),
-    ]:
-        file_name = f"{agreement_id}_{safe_name}.{ext}"
-        metadata = {
-            "name": file_name,
-            "parents": [folder_id] if folder_id else [],
-        }
-        media = MediaFileUpload(str(file_path), mimetype=mime_type, resumable=False)
-        uploaded = (
-            service.files()
-            .create(body=metadata, media_body=media, fields="id,name")
-            .execute()
-        )
-        logger.info("Uploaded %s to Drive as %s (id=%s)", file_path.name, file_name, uploaded.get("id"))
-        results[f"{ext}_id"] = uploaded.get("id")
-
-    return results
+    file_name = f"{agreement_id}_{safe_name}.zip"
+    metadata = {
+        "name": file_name,
+        "parents": [folder_id] if folder_id else [],
+    }
+    media = MediaFileUpload(str(zip_path), mimetype="application/zip", resumable=False)
+    uploaded = (
+        service.files()
+        .create(body=metadata, media_body=media, fields="id,name")
+        .execute()
+    )
+    logger.info("Uploaded ZIP to Drive as %s (id=%s)", file_name, uploaded.get("id"))
+    return {"zip_id": uploaded.get("id")}
