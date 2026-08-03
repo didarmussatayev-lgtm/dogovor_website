@@ -92,6 +92,7 @@ async def create_agreement(body: AgreementRequest):
                     full_name=body.full_name,
                     service_account_info=settings.service_account_info,
                     service_account_file=settings.google_service_account_file,
+                    oauth_credentials_info=settings.oauth_credentials_info,
                 )
             except Exception as exc:
                 drive_error = str(exc)
