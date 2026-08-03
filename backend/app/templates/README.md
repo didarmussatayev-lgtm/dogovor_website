@@ -11,17 +11,22 @@ Generation rules:
 - `general` and `invasia` are always generated
 - `pregnant` is generated only when `gender=female`
 
-Supported placeholders:
+Supported placeholders (recommended):
 
 - `{{ agreement_id }}`
 - `{{ date }}` / `{{date}}`
 - `{{ full_name }}`
-- `{{Дата рождения}}`
+- `{{ birth_date }}`
 - `{{ phone }}`
 - `{{ iin }}`
-- `{{пол}}`
+- `{{ gender }}`
 - `{{ allergy }}`
 - `{{ procedure }}`
 - `{{ signature }}`
 
 `{{ signature }}` is rendered as an inline PNG image.
+
+Legacy compatibility:
+
+- Existing templates with `{{Дата рождения}}` and `{{пол}}` are auto-normalized on render.
+- New templates should use only ASCII/underscore variable names (example: `birth_date`, `gender`) to avoid Jinja parse errors.
