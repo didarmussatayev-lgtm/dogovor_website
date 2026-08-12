@@ -118,7 +118,7 @@ async def create_agreement(body: AgreementRequest):
             pdf_paths.append(pdf_path)
 
         # 3. Build ZIP with generated PDF files only
-        zip_name = f"{patient_file_base}.zip"
+        zip_name = "Promed.zip"
         zip_path = tmp_dir / zip_name
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for generated_file in pdf_paths:
