@@ -52,7 +52,8 @@ async def create_agreement(body: AgreementRequest):
     tmp_dir = Path(tempfile.mkdtemp(prefix="agreement_"))
     try:
         # 1. Pick templates by business rule
-        template_dir = Path(settings.template_path).parent
+        # Resolve template directory relative to this file so it works in any working directory
+        template_dir = Path(__file__).resolve().parent / "templates"
         template_candidates = {
             "general": ["soglasie_template_general.docx", "soglasie_template general.docx"],
             "invasia": ["soglasie_template_invasia.docx", "soglasie_template invasia.docx"],
