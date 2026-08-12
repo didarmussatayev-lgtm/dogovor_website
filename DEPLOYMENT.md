@@ -90,6 +90,28 @@ If you see CORS errors, add your Railway domain to the Google Cloud Console as d
 ### Environment Variables
 Railway automatically sets `PORT` environment variable. The `Procfile` uses it to start the Python server.
 
+#### Google Drive Upload (OAuth — recommended for personal Gmail accounts)
+
+Set the following variables in the Railway dashboard under **Variables**:
+
+| Variable | Description |
+|---|---|
+| `GOOGLE_DRIVE_FOLDER_ID` | ID of the Drive folder to upload agreements to (from the folder URL) |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth 2.0 Client ID from Google Cloud Console (type: Web application) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth 2.0 Client Secret |
+| `GOOGLE_OAUTH_REFRESH_TOKEN` | Refresh token obtained by completing the OAuth flow once |
+
+**How to get a refresh token:**
+1. Create OAuth 2.0 credentials (Web application type) in [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Enable the Google Drive API for your project.
+3. Use the [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/) or run a one-time local auth flow to exchange an authorization code for a refresh token with scope `https://www.googleapis.com/auth/drive.file`.
+4. Copy the `refresh_token` value and set it as `GOOGLE_OAUTH_REFRESH_TOKEN` on Railway.
+
+> **Why OAuth instead of a service account?**  
+> Google service accounts do not have personal Drive storage quota. Uploading to a personal Gmail Drive with a service account results in a `403 storageQuotaExceeded` error. OAuth user-delegated credentials use the Drive quota of the authenticated user and work correctly with personal Gmail accounts.
+
+If `GOOGLE_DRIVE_FOLDER_ID` is not set, Drive upload is skipped and agreements are still returned as a ZIP download.
+
 ### Logs
 View logs in Railway dashboard to debug any issues.
 

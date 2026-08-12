@@ -38,6 +38,7 @@ def _build_service(
         raise RuntimeError("Google API client library is not installed")
 
     if oauth_credentials_info:
+        logger.info("Drive auth: using OAuth user-delegated credentials")
         creds = OAuthCredentials(
             token=None,
             refresh_token=oauth_credentials_info["refresh_token"],
@@ -46,11 +47,24 @@ def _build_service(
             token_uri=TOKEN_URI,
             scopes=SCOPES,
         )
+        # Refresh the token immediately so auth errors surface early with a clear message
+        try:
+            import google.auth.transport.requests as google_requests
+
+            creds.refresh(google_requests.Request())
+            logger.info("Drive OAuth token refreshed successfully")
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to refresh OAuth access token — check GOOGLE_OAUTH_CLIENT_ID, "
+                f"GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REFRESH_TOKEN: {exc}"
+            ) from exc
     elif service_account_info:
+        logger.info("Drive auth: using service-account credentials (from JSON env var)")
         creds = service_account.Credentials.from_service_account_info(
             service_account_info, scopes=SCOPES
         )
     elif service_account_file and Path(service_account_file).exists():
+        logger.info("Drive auth: using service-account credentials (from file %s)", service_account_file)
         creds = service_account.Credentials.from_service_account_file(
             service_account_file, scopes=SCOPES
         )
